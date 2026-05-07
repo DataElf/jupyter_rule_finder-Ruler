@@ -520,4 +520,7 @@ MIT License
 
 ***
 
-*Built with passion for risk control strategy analysts.*
+## 📬 联系方式
+@AntiRisk_Lab
+---
+*Built with passion for risk control analysts.*
