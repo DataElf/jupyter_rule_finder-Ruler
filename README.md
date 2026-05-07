@@ -1,4 +1,4 @@
-<img width="1317" height="957" alt="imgs_ruler_for_rule_logo" src="https://github.com/user-attachments/assets/0c50dd4c-3fa6-455d-acf2-f329480b59d8" />
+<img width="517" height="457" alt="imgs_ruler_for_rule_logo" src="https://github.com/user-attachments/assets/0c50dd4c-3fa6-455d-acf2-f329480b59d8" />
 
 # jupyter_rule_finder-Ruler 
 # — AntiRisk Lab
@@ -16,7 +16,8 @@
 1. **规则发现** — 从数十个特征中高效提取具有区分度的规则
 2. **规则筛选** — 按 Lift / Hit Rate 对规则进行分类和评估
 3. **策略组合** — 将多条规则合并，评估组合后的通过率、坏样本命中率、Lift 等指标
-4. **策略监控** — 对策略上线后的效果进行持续可视化追踪
+4. **随机方向** — 随机组合各类策略形成随机策略池，用统计循环采用的方式观察最优策略组合方向
+5. **策略监控** — 对策略上线后的效果进行持续可视化追踪
 
 传统的做法依赖 Excel + SQL 多次查询，流程割裂、效率低下。**Ruler** 将这四个环节整合进 Jupyter Notebook 的单一交互界面，让策略分析师在同一页面完成从规则生成到监控分析的全流程闭环。
 
@@ -65,7 +66,7 @@
 - Pass Rate vs Bad Rate 散点图（时间渐变色，越近期越深）
 - 简洁配色
 
-<img width="1036" height="760" alt="493a8888-b8b0-440c-9911-fa8f10d7a9eb" src="https://github.com/user-attachments/assets/ea1721f6-973e-41fe-8e90-d3e89ffe9e16" />
+<img width="1055" height="830" alt="ba0b0a46-4f79-4360-8db5-e952c215af49" src="https://github.com/user-attachments/assets/3f19dcab-b1a9-47fb-aef9-4efea98da6d1" />
 
 ***
 
