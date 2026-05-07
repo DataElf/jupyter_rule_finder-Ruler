@@ -1,4 +1,4 @@
-<img width="517" height="457" alt="imgs_ruler_for_rule_logo" src="https://github.com/user-attachments/assets/0c50dd4c-3fa6-455d-acf2-f329480b59d8" />
+<img width="517" height="357" alt="imgs_ruler_for_rule_logo" src="https://github.com/user-attachments/assets/0c50dd4c-3fa6-455d-acf2-f329480b59d8" />
 
 # jupyter_rule_finder-Ruler 
 # — AntiRisk Lab
