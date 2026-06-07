@@ -37,7 +37,10 @@
 
 - **Decision Tree** — 单棵树规则提取，可控制树深与最小叶子样本比
 - **Random Forest** — 多棵树集成规则挖掘，可控制树数量、深度和特征采样比
+- **inTrees** — 从树集合中提取完整路径规则，并通过剪枝、冗余去除和 RRF 选择输出紧凑规则集
 - **Demo Rules** — 基于统计分位数的模拟规则生成，用于快速原型验证
+
+inTrees 算法流程详见 [inTrees Rule Mining Workflow](docs/INTREES_RULE_MINING.md)。
 
 ### 4. 三档规则分类
 
@@ -220,7 +223,7 @@ app.display()
 │  ┌──────────────────────────────────────────┐   │
 │  │ [Min Leaf Ratio: ─●──] [Rule Depth: ─●─]  │   │
 │  │ [N Trees: ──●───] [Feature Ratio: ─●──]   │   │
-│  │ [🌲 Decision Tree]  [🌲 Random Forest]     │   │
+│  │ [Decision Tree] [Random Forest] [inTrees] │   │
 │  │ ┌──────────────────────────────────────┐  │   │
 │  │ │ ■ High Lift ≥ 2.5                    │  │   │
 │  │ │ [H:3.2%] [L:4.52] overdue_count > 2  │  │   │
