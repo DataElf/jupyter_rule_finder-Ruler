@@ -7,6 +7,15 @@ import re
 from itertools import combinations
 from sklearn.tree import DecisionTreeClassifier, export_text
 from sklearn.ensemble import RandomForestClassifier
+from .intrees_rules import (
+    extract_rules,
+    get_rule_metrics,
+    prune_rules,
+    remove_redundant_rules,
+    rule_mask as intrees_rule_mask,
+    select_rules,
+    select_rules_rrf,
+)
 
 _COND_RE = re.compile(r'(\w+)\s*(<=|>=|<|>)\s*([0-9.]+)')
 
@@ -307,3 +316,168 @@ def generate_random_forest_rules(df, feature_cols, target='target', n_trees=10,
         progress_callback(95, 'Rule generation complete')
 
     return valid_df.reset_index(drop=True) if not valid_df.empty else pd.DataFrame()
+
+
+def generate_intrees_rules(df, feature_cols, target='target', n_trees=50,
+                           max_depth=4, min_samples_leaf=5,
+                           max_features='sqrt', n_rules=50,
+                           min_hit_rate=0.02, min_lift=1.0,
+                           max_decay=0.05, type_decay=2,
+                           jaccard_thresh=0.85, use_rrf=True,
+                           rrf_min_gain=0.0, rrf_lambda_len=0.02,
+                           rrf_gamma_overlap=0.5, progress_callback=None):
+    """Generate complete path rules with an inTrees-style pipeline.
+
+    The output schema intentionally matches the rest of Ruler:
+    rule, hit_rate, bad_rate, lift, mask, and var_count.
+    """
+    X_df = df[feature_cols].copy()
+    y = df[target].values
+    overall_bad_rate = df[target].mean()
+
+    n_features = X_df.shape[1]
+    if isinstance(max_features, str):
+        if max_features == 'sqrt':
+            mf = int(max(1, np.sqrt(n_features)))
+        elif max_features == 'log2':
+            mf = int(max(1, np.log2(n_features)))
+        else:
+            mf = min(n_features, max(1, int(float(max_features) * n_features)))
+    else:
+        mf = min(n_features, max(1, int(max_features)))
+
+    if progress_callback:
+        progress_callback(10, 'Training inTrees forest...')
+
+    clf = RandomForestClassifier(
+        n_estimators=n_trees,
+        max_depth=max_depth,
+        min_samples_leaf=max(min_samples_leaf, 5),
+        max_features=mf,
+        class_weight='balanced',
+        random_state=42,
+        n_jobs=-1,
+        bootstrap=True,
+        oob_score=False
+    )
+    clf.fit(X_df.values, y)
+
+    if progress_callback:
+        progress_callback(30, 'Extracting path rules...')
+
+    raw_rules = extract_rules(clf, feature_names=feature_cols, max_depth=max_depth)
+    if raw_rules.empty:
+        return pd.DataFrame()
+
+    if progress_callback:
+        progress_callback(45, f'Evaluating {len(raw_rules)} path rules...')
+
+    metrics = get_rule_metrics(raw_rules, X_df, y, positive_label=1)
+    if metrics.empty:
+        return pd.DataFrame()
+
+    min_samples = max(5, int(len(df) * min_hit_rate))
+    min_bad_rate = overall_bad_rate * min_lift if overall_bad_rate > 0 else None
+
+    if progress_callback:
+        progress_callback(60, 'Pruning weak rule conditions...')
+
+    pruned = prune_rules(
+        metrics, X_df, y,
+        max_decay=max_decay, type_decay=type_decay, positive_label=1
+    )
+    if pruned.empty:
+        return pd.DataFrame()
+
+    coarse = select_rules(
+        pruned,
+        min_samples=min_samples,
+        min_bad_rate=min_bad_rate,
+        max_len=max_depth,
+        top_k=max(n_rules * 6, n_rules)
+    )
+    if coarse.empty:
+        return pd.DataFrame()
+
+    if progress_callback:
+        progress_callback(75, 'Removing redundant rules...')
+
+    non_redundant = remove_redundant_rules(
+        coarse, X_df, y,
+        jaccard_thresh=jaccard_thresh
+    )
+    if non_redundant.empty:
+        return pd.DataFrame()
+
+    if progress_callback:
+        progress_callback(90, 'Selecting final inTrees rules...')
+
+    if use_rrf:
+        selected = select_rules_rrf(
+            non_redundant, X_df, y,
+            max_rules=n_rules,
+            min_gain=rrf_min_gain,
+            lambda_len=rrf_lambda_len,
+            gamma_overlap=rrf_gamma_overlap,
+            min_samples=min_samples
+        )
+    else:
+        selected = select_rules(
+            non_redundant,
+            min_samples=min_samples,
+            min_bad_rate=min_bad_rate,
+            max_len=max_depth,
+            top_k=n_rules
+        )
+
+    if selected.empty:
+        return pd.DataFrame()
+
+    rows = []
+    for _, row in selected.iterrows():
+        conditions = row['conditions']
+        mask = intrees_rule_mask(X_df, conditions)
+        hit_rate = mask.mean()
+        if hit_rate < min_hit_rate:
+            continue
+        bad_rate_hit = y[mask].mean() if mask.sum() > 0 else 0.0
+        lift = bad_rate_hit / overall_bad_rate if overall_bad_rate > 0 else 0.0
+        if lift <= min_lift:
+            continue
+
+        out = {
+            'rule': _format_intrees_rule(conditions),
+            'hit_rate': hit_rate,
+            'bad_rate': bad_rate_hit,
+            'lift': lift,
+            'mask': mask,
+            'var_count': len(conditions),
+            'recall_rate': row.get('recall_rate', np.nan),
+            'hit_samples': int(mask.sum()),
+            'source': 'inTrees'
+        }
+        if 'rrf_score' in row:
+            out['rrf_score'] = row['rrf_score']
+        rows.append(out)
+
+    if not rows:
+        return pd.DataFrame()
+
+    result = pd.DataFrame(rows)
+    result = result.drop_duplicates(subset=['rule'])
+    result = result.sort_values(
+        ['var_count', 'lift', 'hit_rate'],
+        ascending=[False, False, False]
+    ).head(n_rules)
+
+    if progress_callback:
+        progress_callback(95, 'inTrees rule generation complete')
+
+    return result.reset_index(drop=True)
+
+
+def _format_intrees_rule(conditions):
+    parts = []
+    for feat, op, threshold in conditions:
+        parts.append(f"{feat} {op} {threshold:.2f}")
+    return ' AND '.join(parts)

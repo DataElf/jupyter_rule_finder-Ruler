@@ -9,7 +9,13 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from IPython.display import clear_output, display as ipydisplay
 
-from .rule_mining import generate_demo_rules, classify_rules, generate_decision_tree_rules, generate_random_forest_rules
+from .rule_mining import (
+    generate_demo_rules,
+    classify_rules,
+    generate_decision_tree_rules,
+    generate_random_forest_rules,
+    generate_intrees_rules,
+)
 from .strategy_builder import greedy_lift_select, random_path_search, compute_strategy_stats
 from .monitor import aggregate_stats, swap_analysis, plot_strategy_monitor
 
@@ -448,6 +454,14 @@ class RuleStrategyApp:
         )
         self.random_forest_btn.on_click(self._run_random_forest)
 
+        self.intrees_btn = Button(
+            icon='sitemap', description=' inTrees',
+            layout=Layout(width='155px', margin='0 4px'),
+            style={'button_color': '#f0f4ff', 'text_color': STYLE['accent'],
+                   'font_weight': 'bold', 'border': f'1px solid {STYLE["accent_light"]}', 'border_radius': '6px'}
+        )
+        self.intrees_btn.on_click(self._run_intrees)
+
         self.high_th_slider = w.FloatSlider(value=2.5, min=1.0, max=5.0, step=0.1,
             description='High Lift≥', style={'description_width': 'initial', 'handle_color': STYLE['red']},
             layout=Layout(width='280px'))
@@ -492,7 +506,7 @@ class RuleStrategyApp:
 
         params_row = HBox([self.min_leaf_ratio, self.max_rules, self.n_trees, self.max_features_ratio],
                          layout=Layout(margin='4px 0', flex_wrap='wrap'))
-        btn_row = HBox([self.decision_tree_btn, self.random_forest_btn],
+        btn_row = HBox([self.decision_tree_btn, self.random_forest_btn, self.intrees_btn],
                       layout=Layout(margin='8px 0'))
         progress_row = VBox([self.progress_label, self.progress_bar],
                            layout=Layout(margin='3px 0'))
@@ -543,6 +557,24 @@ class RuleStrategyApp:
         )
         self.progress_bar.value = 100
         self.progress_label.value = f'<span style="color:{STYLE["green"]};">Random Forest complete. {len(self.rule_df)} rules generated.</span>'
+        self._refresh_rules()
+
+    def _run_intrees(self, _):
+        self.progress_bar.value = 0
+        self.progress_label.value = f'<span style="color:{STYLE["accent_light"]};">Training inTrees...</span>'
+        min_samples_leaf = max(5, int(len(self.current_df) * self.min_leaf_ratio.value))
+        n_trees = self.n_trees.value
+        max_depth = self.max_rules.value
+        max_features_ratio = self.max_features_ratio.value
+        self.rule_df = generate_intrees_rules(
+            self.current_df, self.feature_cols, self.target,
+            n_trees=n_trees, max_depth=max_depth,
+            min_samples_leaf=min_samples_leaf,
+            max_features='sqrt' if max_features_ratio >= 0.9 else max_features_ratio,
+            n_rules=50, progress_callback=self._update_progress
+        )
+        self.progress_bar.value = 100
+        self.progress_label.value = f'<span style="color:{STYLE["green"]};">inTrees complete. {len(self.rule_df)} rules generated.</span>'
         self._refresh_rules()
 
     def _update_progress(self, progress, message=''):
